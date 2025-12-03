@@ -1,13 +1,10 @@
 # Lysmata - Lint and Security Tools
 # Install: pip install -r .laf/requirements.txt
 
-# Python linting + formatting (replaces black, isort, flake8, pylint)
+# Python linting + formatting + security (all-in-one, offline, no internet)
 ruff>=0.8.0
 
-# Security: static code analysis (replaces bandit - more modern, better rules)
-semgrep>=1.0.0
-
-# Security: dependency vulnerability scanner (replaces safety - from PyPA, more accurate)
+# Dependency vulnerability scanner (from PyPA, accurate, offline after first run)
 pip-audit>=2.0.0
 
 # YAML linting

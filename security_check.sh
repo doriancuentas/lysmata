@@ -14,10 +14,9 @@ Lysmata - Security Check
 
 Usage: ./security_check.sh [--verbose] [--help]
 
-Detects file types and runs appropriate tools:
-  *.py              -> semgrep (static security analysis)
+Runs security checks (offline, no internet required):
+  *.py              -> ruff with S rules (flake8-bandit)
   requirements.txt  -> pip-audit (dependency vulnerabilities)
-  pyproject.toml    -> pip-audit (dependency vulnerabilities)
 
 Options:
   --verbose   Show detailed findings (default: summary only)
@@ -69,9 +68,6 @@ count_files() {
         -not -path "./.git/*" \
         -not -path "./node_modules/*" \
         -not -path "./__pycache__/*" \
-        -not -path "./tests/*" \
-        -not -path "./test/*" \
-        -not -path "**/migrations/*" \
         2>/dev/null | wc -l | tr -d ' '
 }
 
@@ -79,42 +75,30 @@ echo "Lysmata - Security Check"
 echo "========================"
 echo ""
 
-# Python: semgrep
+# Python: ruff with security rules (S prefix = flake8-bandit)
 if has_files "*.py"; then
-    check_tool semgrep
+    check_tool ruff
     py_count=$(count_files "*.py")
 
-    echo -n "[semgrep] $py_count files... "
+    echo -n "[ruff:security] $py_count files... "
 
-    # Build exclude args from config
-    EXCLUDE_ARGS=""
-    if [[ -f "$LAF_DIR/semgrep.yaml" ]]; then
-        # Extract exclude patterns from yaml
-        while IFS= read -r pattern; do
-            pattern=$(echo "$pattern" | sed 's/^[[:space:]]*-[[:space:]]*//' | tr -d '"')
-            if [[ -n "$pattern" ]]; then
-                EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$pattern"
-            fi
-        done < <(grep -A100 "^exclude:" "$LAF_DIR/semgrep.yaml" | tail -n +2 | grep "^  -")
-    fi
-
-    # Run semgrep with auto rules (no login required)
     if [[ "$VERBOSE" == true ]]; then
-        output=$(semgrep scan --config=auto $EXCLUDE_ARGS . 2>&1) || {
+        # Show only security rules (S prefix)
+        output=$(ruff check --config "$LAF_DIR/ruff.toml" --select=S . 2>&1) || {
             echo "ISSUES"
             EXIT_CODE=1
             echo "$output"
             echo ""
         }
     else
-        output=$(semgrep scan --config=auto $EXCLUDE_ARGS --quiet . 2>&1) || {
+        output=$(ruff check --config "$LAF_DIR/ruff.toml" --select=S --quiet . 2>&1) || {
             echo "ISSUES"
             EXIT_CODE=1
         }
     fi
     [[ $EXIT_CODE -eq 0 ]] && echo "OK"
 else
-    echo "[semgrep] No Python files found"
+    echo "[ruff:security] No Python files found"
 fi
 
 # Dependencies: pip-audit

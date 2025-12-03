@@ -24,12 +24,21 @@ select = [
     "ERA",    # eradicate (commented-out code)
     "PL",     # Pylint rules
     "RUF",    # Ruff-specific rules
+    "S",      # flake8-bandit (security checks - offline, no internet needed)
 ]
 
 ignore = [
     "PLR0913",  # Too many arguments - sometimes unavoidable
     "PLR2004",  # Magic value comparison - too noisy
+    "S101",     # assert usage - ok in tests (ruff auto-ignores test files)
 ]
+
+# Exclude test files from security checks (asserts are fine there)
+[lint.per-file-ignores]
+"**/tests/**/*.py" = ["S101"]
+"**/test_*.py" = ["S101"]
+"**/*_test.py" = ["S101"]
+"**/conftest.py" = ["S101"]
 
 # Auto-fix all fixable issues
 fixable = ["ALL"]

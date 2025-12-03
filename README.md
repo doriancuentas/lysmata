@@ -10,6 +10,8 @@
 
 Project-agnostic linting, formatting, and security scanning scripts. Drop into any project for consistent code quality.
 
+**Offline-first**: No internet required. All tools work locally.
+
 ## Install
 
 ```bash
@@ -36,7 +38,7 @@ pip install -r .laf/requirements.txt
 
 | File Type | Lint Tool | Security Tool |
 |-----------|-----------|---------------|
-| `*.py` | ruff | semgrep |
+| `*.py` | ruff | ruff (S rules) |
 | `*.yaml/*.yml` | yamllint | - |
 | `*.html` | curlylint | - |
 | `requirements.txt` | - | pip-audit |
@@ -48,12 +50,11 @@ All configuration lives in `.laf/`:
 ```
 .laf/
 ├── requirements.txt   # Tool dependencies
-├── ruff.toml          # Python lint + format
-├── semgrep.yaml       # Security scanner exclusions
+├── ruff.toml          # Python lint + format + security
 ├── yamllint.yaml      # YAML lint rules
 ├── curlylint.toml     # HTML template lint rules
-└── templates/         # Project-specific configs
-    └── bumerange/     # Django + Vue + PostGIS stack
+└── templates/         # Project-specific stack docs
+    └── bumerange/     # Django + Vue + PostGIS
 ```
 
 ## Exit Codes
@@ -63,11 +64,12 @@ All configuration lives in `.laf/`:
 
 ## Philosophy
 
+- **Offline-first**: No internet required, all tools work locally
 - **Fail-fast**: Missing tool = immediate exit with install instructions
 - **Strict by default**: One config, no "levels"
 - **Summary output**: Clean CI logs; `--verbose` for debugging
 - **Project-agnostic**: Auto-detects file types, no hardcoded paths
-- **Sensible exclusions**: Tests and migrations excluded from security scans
+- **Sensible exclusions**: Tests excluded from assert warnings
 
 ## License
 
