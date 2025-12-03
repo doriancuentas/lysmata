@@ -8,7 +8,7 @@
 
 ## What
 
-Project-agnostic linting, formatting, and security scanning scripts. Drop into any project for consistent code quality.
+Project-agnostic code quality script. Drop into any project for consistent linting, formatting, and security scanning.
 
 **Offline-first**: No internet required. All tools work locally.
 
@@ -20,28 +20,19 @@ pip install -r .laf/requirements.txt
 
 ## Usage
 
-### Lint & Format
-
 ```bash
-./lint_and_format.sh           # Summary output
-./lint_and_format.sh --verbose # Detailed errors
-```
-
-### Security Check
-
-```bash
-./security_check.sh           # Summary output
-./security_check.sh --verbose # Detailed findings
+./check.sh           # Summary output
+./check.sh --verbose # Detailed errors
 ```
 
 ## Tools
 
-| File Type | Lint Tool | Security Tool |
-|-----------|-----------|---------------|
-| `*.py` | ruff | ruff (S rules) |
-| `*.yaml/*.yml` | yamllint | - |
-| `*.html` | curlylint | - |
-| `requirements.txt` | - | pip-audit |
+| File Type | What it does |
+|-----------|--------------|
+| `*.py` | ruff (lint + format + security) |
+| `*.yaml/*.yml` | yamllint |
+| `*.html` | curlylint |
+| `requirements.txt` | pip-audit (vulnerabilities) |
 
 ## Config
 
@@ -64,12 +55,11 @@ All configuration lives in `.laf/`:
 
 ## Philosophy
 
-- **Offline-first**: No internet required, all tools work locally
-- **Fail-fast**: Missing tool = immediate exit with install instructions
-- **Strict by default**: One config, no "levels"
-- **Summary output**: Clean CI logs; `--verbose` for debugging
-- **Project-agnostic**: Auto-detects file types, no hardcoded paths
-- **Sensible exclusions**: Tests excluded from assert warnings
+- **Offline-first**: No internet required
+- **Fail-fast**: Missing tool = immediate exit
+- **One script**: Lint + format + security in one command
+- **Summary output**: Clean CI logs; `--verbose` for details
+- **Project-agnostic**: Auto-detects file types
 
 ## License
 
