@@ -1,0 +1,56 @@
+# Yamllint configuration - YAML linting
+# Docs: https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  # Allow 120 char lines (matches ruff config)
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # Require document start marker (---) for clarity
+  document-start:
+    present: false  # Not required, but allowed
+
+  # Indentation: 2 spaces (YAML standard)
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Allow inline comments
+  comments:
+    require-starting-space: true
+    ignore-shebangs: true
+    min-spaces-from-content: 1
+
+  # Truthy values: only allow true/false (not yes/no/on/off)
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+
+  # Empty lines
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  # Trailing spaces not allowed
+  trailing-spaces: enable
+
+  # Brackets and braces spacing
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+
+# Ignore paths
+ignore: |
+  .venv/
+  venv/
+  node_modules/
+  .git/

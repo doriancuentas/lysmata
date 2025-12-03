@@ -1,0 +1,51 @@
+# Ruff configuration - Python linting and formatting
+# Docs: https://docs.astral.sh/ruff/configuration/
+
+# Modern line length (not the archaic 79)
+line-length = 120
+
+# Target Python 3.11+
+target-version = "py311"
+
+[lint]
+# Enable strict rule sets
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes (undefined names, unused imports)
+    "I",      # isort (import sorting)
+    "B",      # flake8-bugbear (common bugs and design issues)
+    "C4",     # flake8-comprehensions (simplify comprehensions)
+    "UP",     # pyupgrade (modern Python syntax)
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify (simplify code)
+    "TCH",    # flake8-type-checking (move imports to TYPE_CHECKING)
+    "PTH",    # flake8-use-pathlib (prefer pathlib over os.path)
+    "ERA",    # eradicate (commented-out code)
+    "PL",     # Pylint rules
+    "RUF",    # Ruff-specific rules
+]
+
+ignore = [
+    "PLR0913",  # Too many arguments - sometimes unavoidable
+    "PLR2004",  # Magic value comparison - too noisy
+]
+
+# Auto-fix all fixable issues
+fixable = ["ALL"]
+
+[lint.isort]
+# Group imports: stdlib, third-party, local
+known-first-party = []
+force-single-line = false
+combine-as-imports = true
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+
+# Unix-style line endings
+line-ending = "lf"
+
+# Indent with spaces
+indent-style = "space"

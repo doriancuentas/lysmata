@@ -1,0 +1,34 @@
+# Curlylint configuration - HTML template linting
+# Docs: https://www.curlylint.org/docs/configuration
+
+[tool.curlylint]
+
+# Include these file patterns
+include = '\.(html|jinja|jinja2)$'
+
+# Exclude paths
+exclude = '''
+(
+  \.venv
+  | venv
+  | node_modules
+  | \.git
+  | migrations
+)
+'''
+
+[tool.curlylint.rules]
+# Require alt attribute on images (accessibility)
+image_alt = true
+
+# Require meta viewport tag
+meta_viewport = true
+
+# Disallow inline styles
+# no_inline_styles = true  # Uncomment if you want strict
+
+# Aria rules for accessibility
+aria_role = true
+
+# Require lang attribute on html tag
+html_has_lang = true
