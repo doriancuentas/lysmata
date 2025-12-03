@@ -4,11 +4,11 @@
 # Python linting + formatting (replaces black, isort, flake8, pylint)
 ruff>=0.8.0
 
-# Python security scanner (static analysis)
-bandit>=1.7.0
+# Security: static code analysis (replaces bandit - more modern, better rules)
+semgrep>=1.0.0
 
-# Python dependency vulnerability scanner
-safety>=3.0.0
+# Security: dependency vulnerability scanner (replaces safety - from PyPA, more accurate)
+pip-audit>=2.0.0
 
 # YAML linting
 yamllint>=1.35.0

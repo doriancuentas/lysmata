@@ -15,9 +15,9 @@ Lysmata - Security Check
 Usage: ./security_check.sh [--verbose] [--help]
 
 Detects file types and runs appropriate tools:
-  *.py              -> bandit (static security analysis)
-  requirements.txt  -> safety (dependency vulnerabilities)
-  pyproject.toml    -> safety (dependency vulnerabilities)
+  *.py              -> semgrep (static security analysis)
+  requirements.txt  -> pip-audit (dependency vulnerabilities)
+  pyproject.toml    -> pip-audit (dependency vulnerabilities)
 
 Options:
   --verbose   Show detailed findings (default: summary only)
@@ -69,6 +69,9 @@ count_files() {
         -not -path "./.git/*" \
         -not -path "./node_modules/*" \
         -not -path "./__pycache__/*" \
+        -not -path "./tests/*" \
+        -not -path "./test/*" \
+        -not -path "**/migrations/*" \
         2>/dev/null | wc -l | tr -d ' '
 }
 
@@ -76,31 +79,48 @@ echo "Lysmata - Security Check"
 echo "========================"
 echo ""
 
-# Python: bandit
+# Python: semgrep
 if has_files "*.py"; then
-    check_tool bandit
+    check_tool semgrep
     py_count=$(count_files "*.py")
 
-    echo -n "[bandit] $py_count files... "
-    output=$(bandit -c "$LAF_DIR/bandit.yaml" -r . -f txt -q 2>&1) || {
-        echo "ISSUES"
-        EXIT_CODE=1
-        if [[ "$VERBOSE" == true ]]; then
+    echo -n "[semgrep] $py_count files... "
+
+    # Build exclude args from config
+    EXCLUDE_ARGS=""
+    if [[ -f "$LAF_DIR/semgrep.yaml" ]]; then
+        # Extract exclude patterns from yaml
+        while IFS= read -r pattern; do
+            pattern=$(echo "$pattern" | sed 's/^[[:space:]]*-[[:space:]]*//' | tr -d '"')
+            if [[ -n "$pattern" ]]; then
+                EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$pattern"
+            fi
+        done < <(grep -A100 "^exclude:" "$LAF_DIR/semgrep.yaml" | tail -n +2 | grep "^  -")
+    fi
+
+    # Run semgrep with auto rules (no login required)
+    if [[ "$VERBOSE" == true ]]; then
+        output=$(semgrep scan --config=auto $EXCLUDE_ARGS . 2>&1) || {
+            echo "ISSUES"
+            EXIT_CODE=1
             echo "$output"
             echo ""
-        fi
-    }
+        }
+    else
+        output=$(semgrep scan --config=auto $EXCLUDE_ARGS --quiet . 2>&1) || {
+            echo "ISSUES"
+            EXIT_CODE=1
+        }
+    fi
     [[ $EXIT_CODE -eq 0 ]] && echo "OK"
 else
-    echo "[bandit] No Python files found"
+    echo "[semgrep] No Python files found"
 fi
 
-# Dependencies: safety
+# Dependencies: pip-audit
 REQ_FILES=()
-[[ -f "requirements.txt" ]] && REQ_FILES+=("requirements.txt")
-[[ -f "requirements-dev.txt" ]] && REQ_FILES+=("requirements-dev.txt")
 
-# Find all requirements*.txt files
+# Find requirements files
 while IFS= read -r -d '' file; do
     REQ_FILES+=("$file")
 done < <(find . -maxdepth 2 -name "requirements*.txt" \
@@ -109,38 +129,50 @@ done < <(find . -maxdepth 2 -name "requirements*.txt" \
     -not -path "./.laf/*" \
     -print0 2>/dev/null)
 
-# Remove duplicates
-REQ_FILES=($(printf "%s\n" "${REQ_FILES[@]}" | sort -u))
+# Remove duplicates and sort
+if [[ ${#REQ_FILES[@]} -gt 0 ]]; then
+    REQ_FILES=($(printf "%s\n" "${REQ_FILES[@]}" | sort -u))
+fi
 
 if [[ ${#REQ_FILES[@]} -gt 0 ]]; then
-    check_tool safety
+    check_tool pip-audit
 
     for req_file in "${REQ_FILES[@]}"; do
-        echo -n "[safety] $req_file... "
-        output=$(safety check -r "$req_file" --output text 2>&1) || {
-            echo "VULNERABILITIES"
-            EXIT_CODE=1
-            if [[ "$VERBOSE" == true ]]; then
+        echo -n "[pip-audit] $req_file... "
+        if [[ "$VERBOSE" == true ]]; then
+            output=$(pip-audit -r "$req_file" 2>&1) || {
+                echo "VULNERABILITIES"
+                EXIT_CODE=1
                 echo "$output"
                 echo ""
-            fi
-        }
-        [[ $EXIT_CODE -eq 0 ]] && echo "OK"
+            }
+        else
+            output=$(pip-audit -r "$req_file" --progress-spinner=off 2>&1) || {
+                echo "VULNERABILITIES"
+                EXIT_CODE=1
+            }
+        fi
+        [[ $? -eq 0 ]] && echo "OK"
     done
 elif [[ -f "pyproject.toml" ]]; then
-    check_tool safety
-    echo -n "[safety] pyproject.toml... "
-    output=$(safety check --output text 2>&1) || {
-        echo "VULNERABILITIES"
-        EXIT_CODE=1
-        if [[ "$VERBOSE" == true ]]; then
+    check_tool pip-audit
+    echo -n "[pip-audit] pyproject.toml... "
+    if [[ "$VERBOSE" == true ]]; then
+        output=$(pip-audit 2>&1) || {
+            echo "VULNERABILITIES"
+            EXIT_CODE=1
             echo "$output"
             echo ""
-        fi
-    }
-    [[ $EXIT_CODE -eq 0 ]] && echo "OK"
+        }
+    else
+        output=$(pip-audit --progress-spinner=off 2>&1) || {
+            echo "VULNERABILITIES"
+            EXIT_CODE=1
+        }
+    fi
+    [[ $? -eq 0 ]] && echo "OK"
 else
-    echo "[safety] Warning: No requirements.txt or pyproject.toml found"
+    echo "[pip-audit] Warning: No requirements.txt or pyproject.toml found"
 fi
 
 echo ""

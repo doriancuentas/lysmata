@@ -36,10 +36,10 @@ pip install -r .laf/requirements.txt
 
 | File Type | Lint Tool | Security Tool |
 |-----------|-----------|---------------|
-| `*.py` | ruff | bandit |
+| `*.py` | ruff | semgrep |
 | `*.yaml/*.yml` | yamllint | - |
 | `*.html` | curlylint | - |
-| `requirements.txt` | - | safety |
+| `requirements.txt` | - | pip-audit |
 
 ## Config
 
@@ -49,9 +49,11 @@ All configuration lives in `.laf/`:
 .laf/
 ├── requirements.txt   # Tool dependencies
 ├── ruff.toml          # Python lint + format
-├── bandit.yaml        # Python security rules
+├── semgrep.yaml       # Security scanner exclusions
 ├── yamllint.yaml      # YAML lint rules
-└── curlylint.toml     # HTML template lint rules
+├── curlylint.toml     # HTML template lint rules
+└── templates/         # Project-specific configs
+    └── bumerange/     # Django + Vue + PostGIS stack
 ```
 
 ## Exit Codes
@@ -65,6 +67,7 @@ All configuration lives in `.laf/`:
 - **Strict by default**: One config, no "levels"
 - **Summary output**: Clean CI logs; `--verbose` for debugging
 - **Project-agnostic**: Auto-detects file types, no hardcoded paths
+- **Sensible exclusions**: Tests and migrations excluded from security scans
 
 ## License
 
