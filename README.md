@@ -61,6 +61,14 @@ All configuration lives in `.laf/`:
 - **Summary output**: Clean CI logs; `--verbose` for details
 - **Project-agnostic**: Auto-detects file types
 
+## Changelog
+
+- **0.3.0** - TypeScript/JavaScript support (eslint, prettier, security scanning, tsc)
+- **0.2.0** - Merged scripts into single check.sh, replaced semgrep with ruff for security
+- **0.1.0** - Initial release with Python, YAML, HTML support
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
+
 ## License
 
 MIT
