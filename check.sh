@@ -15,10 +15,13 @@ Lysmata - Code Quality Check
 Usage: ./check.sh [--verbose] [--help]
 
 Runs all checks (offline, no internet required):
+  *.ts/*.tsx/*.js   -> eslint + prettier (lint + format + security)
   *.py              -> ruff (lint + format + security)
   *.yaml/*.yml      -> yamllint
   *.html            -> curlylint
   requirements.txt  -> pip-audit (dependency vulnerabilities)
+
+Note: TS/JS security requires eslint-plugin-security in your project.
 
 Options:
   --verbose   Show detailed errors (default: summary only)
@@ -76,6 +79,73 @@ count_files() {
 echo "Lysmata - Code Quality Check"
 echo "============================"
 echo ""
+
+# TypeScript/JavaScript: ESLint + Prettier (with security)
+if has_files "*.ts" || has_files "*.tsx" || has_files "*.js"; then
+    ts_count=$(($(count_files "*.ts") + $(count_files "*.tsx") + $(count_files "*.js")))
+
+    # Check for package manager (pnpm preferred, fallback to npm)
+    if command -v pnpm &>/dev/null && [[ -f "pnpm-lock.yaml" ]]; then
+        PM="pnpm"
+    elif command -v npm &>/dev/null; then
+        PM="npm"
+    else
+        echo "[ts/js] Skipping - no package manager found"
+        PM=""
+    fi
+
+    if [[ -n "$PM" ]]; then
+        # Format with prettier (if available)
+        if $PM exec prettier --version &>/dev/null 2>&1; then
+            echo -n "[prettier] $ts_count files... "
+            $PM exec prettier --write "**/*.{ts,tsx,js,json}" --log-level=error 2>/dev/null || true
+            echo "DONE"
+        fi
+
+        # Lint + Fix with eslint (if available)
+        if $PM exec eslint --version &>/dev/null 2>&1; then
+            echo -n "[eslint:fix] $ts_count files... "
+            $PM exec eslint --fix . --quiet 2>/dev/null || true
+            echo "DONE"
+
+            # Check (includes security rules if eslint-plugin-security installed)
+            echo -n "[eslint:check] $ts_count files... "
+            if [[ "$VERBOSE" == true ]]; then
+                output=$($PM exec eslint . 2>&1) || {
+                    echo "ISSUES"
+                    EXIT_CODE=1
+                    echo "$output"
+                    echo ""
+                }
+            else
+                output=$($PM exec eslint . --quiet 2>&1) || {
+                    echo "ISSUES"
+                    EXIT_CODE=1
+                }
+            fi
+            [[ $EXIT_CODE -eq 0 ]] && echo "OK"
+        fi
+
+        # Type check (if tsc available)
+        if $PM exec tsc --version &>/dev/null 2>&1; then
+            echo -n "[tsc] type checking... "
+            if [[ "$VERBOSE" == true ]]; then
+                output=$($PM exec tsc --noEmit 2>&1) || {
+                    echo "ISSUES"
+                    EXIT_CODE=1
+                    echo "$output"
+                    echo ""
+                }
+            else
+                output=$($PM exec tsc --noEmit 2>&1) || {
+                    echo "ISSUES"
+                    EXIT_CODE=1
+                }
+            fi
+            [[ $EXIT_CODE -eq 0 ]] && echo "OK"
+        fi
+    fi
+fi
 
 # Python: ruff (lint + format + security)
 if has_files "*.py"; then
