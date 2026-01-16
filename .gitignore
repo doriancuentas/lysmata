@@ -11,3 +11,6 @@ venv/
 .idea/
 .vscode/
 *.swp
+
+# Lysmata logs
+.laf/logs/
