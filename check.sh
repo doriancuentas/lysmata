@@ -11,6 +11,14 @@ EXIT_CODE=0
 RUN_ID=$(date +%Y%m%d_%H%M%S)_$$
 START_TIME=$(date +%s)
 
+# Temp directory with cleanup trap (security fix: ensures cleanup on exit)
+TMP_DIR=$(mktemp -d)
+cleanup() { rm -rf "$TMP_DIR"; }
+trap cleanup EXIT
+
+# Common exclusion directories (DRY: used in find commands)
+EXCLUDE_DIRS=(".venv" "venv" ".git" "node_modules" "__pycache__")
+
 show_usage() {
     cat << 'EOF'
 Lysmata - Code Quality Check
@@ -46,7 +54,7 @@ init_logs() {
 # Log detection results
 log_detection() {
     local lang="$1" count="$2" patterns="$3"
-    local tmp=$(mktemp)
+    local tmp="$TMP_DIR/jq_out"
     jq --arg l "$lang" --arg c "$count" --arg p "$patterns" \
         '.detection[$l] = {"count": ($c|tonumber), "patterns": $p}' "$LOG_FILE" > "$tmp" && mv "$tmp" "$LOG_FILE"
 }
@@ -54,7 +62,7 @@ log_detection() {
 # Log tool execution
 log_tool() {
     local tool="$1" status="$2" files="$3" duration="${4:-0}"
-    local tmp=$(mktemp)
+    local tmp="$TMP_DIR/jq_out"
     jq --arg t "$tool" --arg s "$status" --arg f "$files" --arg d "$duration" \
         '.tools += [{"tool": $t, "status": $s, "files": ($f|tonumber), "duration_sec": ($d|tonumber)}]' "$LOG_FILE" > "$tmp" && mv "$tmp" "$LOG_FILE"
 }
@@ -62,7 +70,7 @@ log_tool() {
 # Log exclusion patterns hit
 log_exclusion() {
     local pattern="$1" count="$2"
-    local tmp=$(mktemp)
+    local tmp="$TMP_DIR/jq_out"
     jq --arg p "$pattern" --arg c "$count" \
         '.exclusions[$p] = ($c|tonumber)' "$LOG_FILE" > "$tmp" && mv "$tmp" "$LOG_FILE"
 }
@@ -71,7 +79,7 @@ log_exclusion() {
 finalize_log() {
     local end_time=$(date +%s)
     local duration=$((end_time - START_TIME))
-    local tmp=$(mktemp)
+    local tmp="$TMP_DIR/jq_out"
     jq --arg d "$duration" --arg e "$EXIT_CODE" \
         '.duration_sec = ($d|tonumber) | .exit_code = ($e|tonumber)' "$LOG_FILE" > "$tmp" && mv "$tmp" "$LOG_FILE"
 }
@@ -177,6 +185,15 @@ check_tool() {
     fi
 }
 
+# Build find exclusion arguments from EXCLUDE_DIRS
+build_find_excludes() {
+    local excludes=""
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        excludes="$excludes -not -path \"./$dir/*\""
+    done
+    echo "$excludes"
+}
+
 # Count excluded files for logging
 count_excluded() {
     local pattern="$1" dir="$2"
@@ -187,32 +204,28 @@ count_excluded() {
 log_exclusions_for() {
     [[ "$LOGGING_ENABLED" != true ]] && return 0
     local pattern="$1"
-    for dir in .venv venv .git node_modules __pycache__; do
+    for dir in "${EXCLUDE_DIRS[@]}"; do
         local cnt=$(count_excluded "$pattern" "$dir")
         [[ "$cnt" -gt 0 ]] && log_exclusion "$dir" "$cnt"
     done
     return 0
 }
 
-# Detect files
+# Detect files (using EXCLUDE_DIRS)
 has_files() {
-    find . -type f -name "$1" \
-        -not -path "./.venv/*" \
-        -not -path "./venv/*" \
-        -not -path "./.git/*" \
-        -not -path "./node_modules/*" \
-        -not -path "./__pycache__/*" \
-        2>/dev/null | head -1 | grep -q .
+    local cmd="find . -type f -name \"$1\""
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        cmd="$cmd -not -path \"./$dir/*\""
+    done
+    eval "$cmd" 2>/dev/null | head -1 | grep -q .
 }
 
 count_files() {
-    find . -type f -name "$1" \
-        -not -path "./.venv/*" \
-        -not -path "./venv/*" \
-        -not -path "./.git/*" \
-        -not -path "./node_modules/*" \
-        -not -path "./__pycache__/*" \
-        2>/dev/null | wc -l | tr -d ' '
+    local cmd="find . -type f -name \"$1\""
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        cmd="$cmd -not -path \"./$dir/*\""
+    done
+    eval "$cmd" 2>/dev/null | wc -l | tr -d ' '
 }
 
 echo "Lysmata - Code Quality Check"
@@ -239,7 +252,8 @@ if has_files "*.ts" || has_files "*.tsx" || has_files "*.js"; then
     elif command -v npm &>/dev/null; then
         PM="npm"
     else
-        echo "[ts/js] Skipping - no package manager found"
+        echo "[ts/js] WARNING: $ts_count TS/JS files found but no package manager (npm/pnpm) available"
+        echo "        Install npm or pnpm to enable linting and formatting"
         PM=""
     fi
 
@@ -248,6 +262,7 @@ if has_files "*.ts" || has_files "*.tsx" || has_files "*.js"; then
         if $PM exec prettier --version &>/dev/null 2>&1; then
             echo -n "[prettier] $ts_count files... "
             tool_start=$(date +%s)
+            # || true: prettier returns non-zero when files change, which is expected
             $PM exec prettier --write "**/*.{ts,tsx,js,json}" --log-level=error 2>/dev/null || true
             tool_end=$(date +%s)
             echo "DONE"
@@ -257,9 +272,12 @@ if has_files "*.ts" || has_files "*.tsx" || has_files "*.js"; then
         # Lint + Fix with eslint (if available)
         if $PM exec eslint --version &>/dev/null 2>&1; then
             echo -n "[eslint:fix] $ts_count files... "
+            tool_start=$(date +%s)
+            # || true: eslint --fix returns non-zero when it fixes issues, which is expected
             $PM exec eslint --fix . --quiet 2>/dev/null || true
+            tool_end=$(date +%s)
             echo "DONE"
-            [[ "$LOGGING_ENABLED" == true ]] && log_tool "eslint:fix" "done" "$ts_count" "0"
+            [[ "$LOGGING_ENABLED" == true ]] && log_tool "eslint:fix" "done" "$ts_count" "$((tool_end - tool_start))"
 
             # Check (includes security rules if eslint-plugin-security installed)
             echo -n "[eslint:check] $ts_count files... "
@@ -325,15 +343,21 @@ if has_files "*.py"; then
 
     # Fix
     echo -n "[ruff:fix] $py_count files... "
+    tool_start=$(date +%s)
+    # || true: ruff fix returns non-zero when it fixes issues, which is expected
     ruff check --config "$LAF_DIR/ruff.toml" --fix --quiet . 2>/dev/null || true
+    tool_end=$(date +%s)
     echo "DONE"
-    [[ "$LOGGING_ENABLED" == true ]] && log_tool "ruff:fix" "done" "$py_count" "0"
+    [[ "$LOGGING_ENABLED" == true ]] && log_tool "ruff:fix" "done" "$py_count" "$((tool_end - tool_start))"
 
     # Format
     echo -n "[ruff:format] $py_count files... "
+    tool_start=$(date +%s)
+    # || true: ruff format returns non-zero when it formats files, which is expected
     ruff format --config "$LAF_DIR/ruff.toml" --quiet . 2>/dev/null || true
+    tool_end=$(date +%s)
     echo "DONE"
-    [[ "$LOGGING_ENABLED" == true ]] && log_tool "ruff:format" "done" "$py_count" "0"
+    [[ "$LOGGING_ENABLED" == true ]] && log_tool "ruff:format" "done" "$py_count" "$((tool_end - tool_start))"
 
     # Check (includes security S rules)
     echo -n "[ruff:check] $py_count files... "
@@ -390,7 +414,7 @@ if has_files "*.yaml" || has_files "*.yml"; then
         }
     fi
     tool_end=$(date +%s)
-    [[ -z "${output:-}" ]] && echo "OK"
+    [[ "$yaml_status" == "ok" ]] && echo "OK"
     [[ "$LOGGING_ENABLED" == true ]] && log_tool "yamllint" "$yaml_status" "$yaml_count" "$((tool_end - tool_start))"
 fi
 
