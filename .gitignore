@@ -14,3 +14,7 @@ venv/
 
 # Lysmata logs
 .laf/logs/
+
+# Firebase
+firebase-debug.log
+.firebaserc
